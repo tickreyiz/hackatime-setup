@@ -6,7 +6,7 @@ use color_eyre::Result;
 pub use jetbrains::JetBrainsFamily;
 pub use vscode::VsCodeFamily;
 
-pub trait EditorPlugin {
+pub trait EditorPlugin: Send + Sync {
     /// Human-readable name, e.g. "VS Code", "Cursor"
     fn name(&self) -> String;
 

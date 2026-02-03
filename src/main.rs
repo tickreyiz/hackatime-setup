@@ -1,12 +1,14 @@
 use clap::Parser;
 use color_eyre::{Result, eyre::ContextCompat};
 use colored::Colorize;
-use dialoguer::{Confirm, theme::ColorfulTheme};
+use dialoguer::{Confirm, MultiSelect, theme::ColorfulTheme};
+use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use inkjet::{
     Highlighter, Language,
     formatter::Terminal,
     theme::{Theme, vendored},
 };
+use rayon::prelude::*;
 use termcolor::{ColorChoice, StandardStream};
 
 mod editor_plugins;
@@ -60,10 +62,64 @@ fn main() -> Result<()> {
         format!("Config written to {}", config_path.display()).green()
     );
 
-    let editors = editor_plugins::all_editors();
-    for editor in editors {
-        dbg!(editor.name());
+    println!("\n{}", "Scanning for installed editors...".dimmed());
+    let all_editors = editor_plugins::all_editors();
+    let installed_editors: Vec<_> = all_editors
+        .into_par_iter()
+        .filter(|e| e.is_installed())
+        .collect();
+
+    if installed_editors.is_empty() {
+        println!("{}", "No supported editors found.".yellow());
+        return Ok(());
     }
+
+    let editor_names: Vec<String> = installed_editors.iter().map(|e| e.name()).collect();
+    let selections = MultiSelect::with_theme(&ColorfulTheme::default())
+        .with_prompt("Select editors to install WakaTime plugin for")
+        .items(&editor_names)
+        .interact()?;
+
+    if selections.is_empty() {
+        println!("{}", "No editors selected.".dimmed());
+        return Ok(());
+    }
+
+    let selected_editors: Vec<_> = selections
+        .into_iter()
+        .map(|i| &installed_editors[i])
+        .collect();
+
+    let mp = MultiProgress::new();
+    let style = ProgressStyle::default_spinner()
+        .template("{spinner:.green} {msg}")?
+        .tick_chars("⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏");
+
+    let progress_bars: Vec<_> = selected_editors
+        .iter()
+        .map(|e| {
+            let pb = mp.add(ProgressBar::new_spinner());
+            pb.set_style(style.clone());
+            pb.set_message(format!("Installing for {}...", e.name()));
+            pb.enable_steady_tick(std::time::Duration::from_millis(80));
+            pb
+        })
+        .collect();
+
+    selected_editors
+        .par_iter()
+        .zip(progress_bars.par_iter())
+        .for_each(|(editor, pb)| {
+            let name = editor.name();
+            match editor.install() {
+                Ok(()) => {
+                    pb.finish_with_message(format!("{} {} installed", "✔".green(), name));
+                }
+                Err(e) => {
+                    pb.finish_with_message(format!("{} {} failed: {}", "✘".red(), name, e));
+                }
+            }
+        });
 
     Ok(())
 }

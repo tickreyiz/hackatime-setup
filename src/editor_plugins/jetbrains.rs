@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 use std::process::Command;
 
-use color_eyre::{eyre::eyre, Result};
+use color_eyre::{Result, eyre::eyre};
 
 use super::EditorPlugin;
 
@@ -90,7 +90,10 @@ impl JetBrainsFamily {
                 "/opt/{}/bin/{}",
                 self.cli_command, self.cli_command
             )));
-            paths.push(PathBuf::from(format!("/usr/local/bin/{}", self.cli_command)));
+            paths.push(PathBuf::from(format!(
+                "/usr/local/bin/{}",
+                self.cli_command
+            )));
             paths.push(PathBuf::from(format!("/snap/bin/{}", self.cli_command)));
         }
 
@@ -114,12 +117,12 @@ impl JetBrainsFamily {
     }
 
     fn find_cli(&self) -> Option<PathBuf> {
-        if let Ok(output) = Command::new("which").arg(self.cli_command).output() {
-            if output.status.success() {
-                let path = String::from_utf8_lossy(&output.stdout).trim().to_string();
-                if !path.is_empty() {
-                    return Some(PathBuf::from(path));
-                }
+        if let Ok(output) = Command::new("which").arg(self.cli_command).output()
+            && output.status.success()
+        {
+            let path = String::from_utf8_lossy(&output.stdout).trim().to_string();
+            if !path.is_empty() {
+                return Some(PathBuf::from(path));
             }
         }
 
@@ -138,13 +141,7 @@ impl JetBrainsFamily {
             }
         }
 
-        for path in self.get_cli_paths() {
-            if path.exists() {
-                return Some(path);
-            }
-        }
-
-        None
+        self.get_cli_paths().into_iter().find(|path| path.exists())
     }
 }
 
@@ -169,10 +166,7 @@ impl EditorPlugin for JetBrainsFamily {
         if status.success() {
             Ok(())
         } else {
-            Err(eyre!(
-                "Failed to install WakaTime plugin for {}",
-                self.name
-            ))
+            Err(eyre!("Failed to install WakaTime plugin for {}", self.name))
         }
     }
 }

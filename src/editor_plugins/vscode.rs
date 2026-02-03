@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 use std::process::Command;
 
-use color_eyre::{eyre::eyre, Result};
+use color_eyre::{Result, eyre::eyre};
 
 use super::EditorPlugin;
 
@@ -10,6 +10,7 @@ pub struct VsCodeFamily {
     pub config_subdir: &'static str,
     pub cli_command: &'static str,
     pub macos_app_name: &'static str,
+    #[allow(dead_code)] // The dead_code lint triggers on non-Windows platforms
     pub windows_app_folder: &'static str,
 }
 
@@ -39,7 +40,10 @@ impl VsCodeFamily {
         #[cfg(target_os = "linux")]
         {
             paths.push(PathBuf::from(format!("/usr/bin/{}", self.cli_command)));
-            paths.push(PathBuf::from(format!("/usr/local/bin/{}", self.cli_command)));
+            paths.push(PathBuf::from(format!(
+                "/usr/local/bin/{}",
+                self.cli_command
+            )));
             if let Some(home) = dirs::home_dir() {
                 paths.push(home.join(format!(".local/bin/{}", self.cli_command)));
             }
@@ -73,14 +77,12 @@ impl VsCodeFamily {
         if let Ok(output) = Command::new("which")
             .arg(format!("{}{}", self.cli_command, cmd_ext))
             .output()
-        {
-            if output.status.success() {
+            && output.status.success() {
                 let path = String::from_utf8_lossy(&output.stdout).trim().to_string();
                 if !path.is_empty() {
                     return Some(PathBuf::from(path));
                 }
             }
-        }
 
         #[cfg(target_os = "windows")]
         if let Ok(output) = Command::new("where").arg(self.cli_command).output() {
@@ -97,13 +99,7 @@ impl VsCodeFamily {
             }
         }
 
-        for path in self.get_cli_paths() {
-            if path.exists() {
-                return Some(path);
-            }
-        }
-
-        None
+        self.get_cli_paths().into_iter().find(|path| path.exists())
     }
 }
 
