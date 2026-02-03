@@ -16,6 +16,7 @@ use rayon::prelude::*;
 use reqwest::blocking::Client;
 use serde::Serialize;
 use termcolor::{ColorChoice, StandardStream};
+use uuid::Uuid;
 
 mod editor_plugins;
 
@@ -119,9 +120,23 @@ fn build_config(api_key: &str, api_url: &str, advanced: bool) -> Result<Ini> {
     Ok(conf)
 }
 
+fn validate_api_key(key: &str) -> Result<(), String> {
+    let uuid = Uuid::try_parse(key)
+        .map_err(|_| "API key must be a valid UUID. Did you copy the command incorrectly?")?;
+    if uuid.get_version_num() != 4 {
+        return Err("API key must be a valid UUIDv4".to_string());
+    }
+    Ok(())
+}
+
 fn main() -> Result<()> {
     color_eyre::install()?;
     let cli = Cli::parse();
+
+    if let Err(e) = validate_api_key(&cli.key) {
+        eprintln!("{} {}", "Error:".red().bold(), e);
+        std::process::exit(1);
+    }
 
     println!("{}", "Welcome to Hackatime!\n".italic());
 
