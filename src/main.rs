@@ -9,6 +9,8 @@ use inkjet::{
 };
 use termcolor::{ColorChoice, StandardStream};
 
+mod editor_plugins;
+
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
 struct Cli {
@@ -57,6 +59,11 @@ fn main() -> Result<()> {
         "✔".green().bold(),
         format!("Config written to {}", config_path.display()).green()
     );
+
+    let editors = editor_plugins::all_editors();
+    for editor in editors {
+        dbg!(editor.name());
+    }
 
     Ok(())
 }
