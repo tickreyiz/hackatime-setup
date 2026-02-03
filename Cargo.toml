@@ -17,9 +17,13 @@ inkjet = { version = "0.11.1", default-features = false, features = [
     "terminal",
 ] }
 termcolor = "1.4"
+terminal_size = "0.4"
 rand = "0.9"
 rust-ini = "0.21.3"
 jsonc-parser = { version = "0.29", features = ["cst"] }
+reqwest = { version = "0.12", features = ["blocking", "json"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
 
 [profile.release]
 lto = true

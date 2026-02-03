@@ -1,3 +1,5 @@
+use std::time::{SystemTime, UNIX_EPOCH};
+
 use clap::Parser;
 use color_eyre::{Result, eyre::ContextCompat};
 use colored::Colorize;
@@ -11,9 +13,13 @@ use inkjet::{
 };
 use rand::Rng;
 use rayon::prelude::*;
+use reqwest::blocking::Client;
+use serde::Serialize;
 use termcolor::{ColorChoice, StandardStream};
 
 mod editor_plugins;
+
+const API_URL: &str = "https://hackatime.hackclub.com/api/hackatime/v1";
 
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
@@ -23,6 +29,15 @@ struct Cli {
     key: String,
 }
 
+#[derive(Serialize)]
+struct Heartbeat {
+    #[serde(rename = "type")]
+    kind: String,
+    time: u64,
+    entity: String,
+    language: String,
+}
+
 fn generate_random_hostname() -> String {
     let mut rng = rand::rng();
     (0..6)
@@ -30,12 +45,47 @@ fn generate_random_hostname() -> String {
         .collect::<String>()
 }
 
+fn send_test_heartbeat(api_key: &str) -> Result<()> {
+    let pb = ProgressBar::new_spinner();
+    pb.set_message("Sending test heartbeat...");
+    pb.enable_steady_tick(std::time::Duration::from_millis(80));
+
+    let timestamp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+
+    let heartbeat = Heartbeat {
+        kind: "file".to_string(),
+        time: timestamp,
+        entity: "test.txt".to_string(),
+        language: "Text".to_string(),
+    };
+
+    let client = Client::new();
+    let response = client
+        .post(format!("{API_URL}/users/current/heartbeats"))
+        .bearer_auth(api_key)
+        .json(&vec![heartbeat])
+        .send()?;
+
+    let status = response.status();
+    if status.is_success() {
+        pb.finish_with_message(format!("{} Test heartbeat sent successfully", "✔".green()));
+        Ok(())
+    } else {
+        let body = response.text().unwrap_or_default();
+        pb.finish_with_message(format!("{} Failed to send heartbeat: {}", "✘".red(), body));
+        Err(color_eyre::eyre::eyre!("Heartbeat failed with status {}", status))
+    }
+}
+
 fn build_config(api_key: &str, advanced: bool) -> Result<Ini> {
     let theme = ColorfulTheme::default();
     let mut conf = Ini::new();
 
     conf.with_section(Some("settings"))
-        .set("api_url", "https://hackatime.hackclub.com/api/hackatime/v1")
+        .set("api_url", API_URL)
         .set("api_key", api_key)
         .set("heartbeat_rate_limit_seconds", "30")
         .set("exclude_unknown_project", "true");
@@ -123,6 +173,11 @@ fn main() -> Result<()> {
         format!("Config written to {}", config_path.display()).green()
     );
 
+    if let Err(e) = send_test_heartbeat(&cli.key) {
+        eprintln!("{} {}", "Warning:".yellow(), e);
+    }
+    println!();
+
     let all_editors = editor_plugins::all_editors();
     let installed_editors: Vec<_> = all_editors
         .into_par_iter()
@@ -184,22 +239,41 @@ fn print_ini(ini: &str) -> Result<()> {
     let mut highlighter = Highlighter::new();
     let theme = Theme::from_helix(vendored::AYU_DARK)?;
 
-    let lines: Vec<&str> = ini.lines().collect();
-    let max_width = lines.iter().map(|l| l.chars().count()).max().unwrap_or(0);
-    let box_width = max_width + 2;
+    let term_width = terminal_size::terminal_size()
+        .map(|(w, _)| w.0 as usize)
+        .unwrap_or(80);
+    let content_width = term_width.saturating_sub(4).max(20);
+    let border_width = content_width + 2;
 
-    println!("┌{}┐", "─".repeat(box_width));
+    println!("┌{}┐", "─".repeat(border_width));
 
-    for line in lines {
-        print!("│ ");
-        let stream = StandardStream::stdout(ColorChoice::Always);
-        let formatter = Terminal::new(theme.clone(), stream);
-        highlighter.highlight_to_writer(Language::Ini, &formatter, line, &mut std::io::sink())?;
-        let padding = max_width - line.chars().count();
-        println!("{} │", " ".repeat(padding));
+    for line in ini.lines() {
+        let line_len = line.chars().count();
+        if line_len <= content_width {
+            print!("│ ");
+            let stream = StandardStream::stdout(ColorChoice::Always);
+            let formatter = Terminal::new(theme.clone(), stream);
+            highlighter.highlight_to_writer(Language::Ini, &formatter, line, &mut std::io::sink())?;
+            let padding = content_width - line_len;
+            println!("{} │", " ".repeat(padding));
+        } else {
+            let mut remaining = line;
+            while !remaining.is_empty() {
+                let chunk: String = remaining.chars().take(content_width).collect();
+                let chunk_len = chunk.chars().count();
+                remaining = &remaining[chunk.len()..];
+
+                print!("│ ");
+                let stream = StandardStream::stdout(ColorChoice::Always);
+                let formatter = Terminal::new(theme.clone(), stream);
+                highlighter.highlight_to_writer(Language::Ini, &formatter, &chunk, &mut std::io::sink())?;
+                let padding = content_width - chunk_len;
+                println!("{} │", " ".repeat(padding));
+            }
+        }
     }
 
-    println!("└{}┘", "─".repeat(box_width));
+    println!("└{}┘", "─".repeat(border_width));
 
     Ok(())
 }
