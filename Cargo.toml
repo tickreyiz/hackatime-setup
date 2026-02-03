@@ -9,7 +9,7 @@ color-eyre = "0.6.5"
 colored = "3.1.1"
 dialoguer = "0.12.0"
 dirs = "6.0.0"
-indicatif = "0.17"
+indicatif = "0.18"
 rayon = "1.10"
 inkjet = { version = "0.11.1", default-features = false, features = [
     "language-ini",
@@ -17,6 +17,8 @@ inkjet = { version = "0.11.1", default-features = false, features = [
     "terminal",
 ] }
 termcolor = "1.4"
+rand = "0.9"
+rust-ini = "0.21.3"
 
 [profile.release]
 lto = true

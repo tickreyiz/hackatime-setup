@@ -1,13 +1,15 @@
 use clap::Parser;
 use color_eyre::{Result, eyre::ContextCompat};
 use colored::Colorize;
-use dialoguer::{Confirm, MultiSelect, theme::ColorfulTheme};
+use dialoguer::{Confirm, MultiSelect, Select, theme::ColorfulTheme};
 use indicatif::ProgressBar;
+use ini::{Ini, WriteOption};
 use inkjet::{
     Highlighter, Language,
     formatter::Terminal,
     theme::{Theme, vendored},
 };
+use rand::Rng;
 use rayon::prelude::*;
 use termcolor::{ColorChoice, StandardStream};
 
@@ -21,23 +23,81 @@ struct Cli {
     key: String,
 }
 
+fn generate_random_hostname() -> String {
+    let mut rng = rand::rng();
+    (0..6)
+        .map(|_| rng.random_range(b'A'..=b'Z') as char)
+        .collect::<String>()
+}
+
+fn build_config(api_key: &str, advanced: bool) -> Result<Ini> {
+    let theme = ColorfulTheme::default();
+    let mut conf = Ini::new();
+
+    conf.with_section(Some("settings"))
+        .set("api_url", "https://hackatime.hackclub.com/api/hackatime/v1")
+        .set("api_key", api_key)
+        .set("heartbeat_rate_limit_seconds", "30")
+        .set("exclude_unknown_project", "true");
+
+    if advanced {
+        let hide_branch = Confirm::with_theme(&theme)
+            .with_prompt("Hide branch names?")
+            .default(false)
+            .interact()?;
+
+        let anonymize_hostname = Confirm::with_theme(&theme)
+            .with_prompt("Anonymize your machine name?")
+            .default(false)
+            .interact()?;
+
+        if hide_branch {
+            conf.with_section(Some("settings"))
+                .set("hide_branch_names", "true");
+        }
+
+        if anonymize_hostname {
+            let hostname = generate_random_hostname();
+            conf.with_section(Some("settings"))
+                .set("hostname", &hostname);
+            println!("{} {}", "Generated hostname:".dimmed(), hostname.cyan());
+        }
+    }
+
+    Ok(conf)
+}
+
 fn main() -> Result<()> {
     color_eyre::install()?;
     let cli = Cli::parse();
 
-    println!(
-        "{} {}\n",
-        "Welcome to Hackatime,".bold().blue(),
-        "Mahad!".bold()
-    );
+    println!("{}", "Welcome to Hackatime!\n".italic());
+
+    let setup_options = vec!["Quick setup", "Advanced setup"];
+    let setup_choice = Select::with_theme(&ColorfulTheme::default())
+        .with_prompt("Which setup mode would you like?")
+        .items(&setup_options)
+        .default(0)
+        .interact()?;
+
+    let is_advanced = setup_choice == 1;
+
+    let conf = build_config(&cli.key, is_advanced)?;
+
+    let write_opt = WriteOption {
+        kv_separator: " = ",
+        ..Default::default()
+    };
+
+    let mut config_string = Vec::new();
+    conf.write_to_opt(&mut config_string, write_opt.clone())?;
+    config_string.extend_from_slice(b"\n# help with config: https://github.com/wakatime/wakatime-cli/blob/develop/USAGE.md#ini-config-file");
+    let generated_config = String::from_utf8(config_string)?;
 
     println!(
-        "Here's the {} file I'm planning to write:\n",
+        "\nHere's the {} file I'm planning to write:\n",
         "~/.wakatime.cfg".green()
     );
-
-    let generated_config: String =
-        include_str!("./config.ini.template").replace("{{key}}", &cli.key);
     print_ini(&generated_config)?;
     println!();
 
@@ -56,14 +116,13 @@ fn main() -> Result<()> {
         .wrap_err("Could not find home directory")?
         .join(".wakatime.cfg");
 
-    std::fs::write(&config_path, &generated_config)?;
+    conf.write_to_file_opt(&config_path, write_opt)?;
     println!(
-        "{} {}",
+        "{} {}\n",
         "✔".green().bold(),
         format!("Config written to {}", config_path.display()).green()
     );
 
-    println!("\n{}", "Scanning for installed editors...".dimmed());
     let all_editors = editor_plugins::all_editors();
     let installed_editors: Vec<_> = all_editors
         .into_par_iter()
@@ -78,7 +137,7 @@ fn main() -> Result<()> {
     let editor_names: Vec<String> = installed_editors.iter().map(|e| e.name()).collect();
     let all_selected: Vec<bool> = vec![true; editor_names.len()];
     let selections = MultiSelect::with_theme(&ColorfulTheme::default())
-        .with_prompt("What editors should I install Hackatime to?")
+        .with_prompt("What editors should I install Hackatime to? (space to select/unselect)")
         .items(&editor_names)
         .defaults(&all_selected)
         .interact()?;
@@ -104,6 +163,15 @@ fn main() -> Result<()> {
             Err(e) => pb.finish_with_message(format!("{} {} failed: {}", "✘".red(), name, e)),
         }
     }
+
+    println!(
+        "{}",
+        "Done! You can now code in your editor to track your time.".bold()
+    );
+    println!(
+        "Instructions for other editors: {}",
+        "https://hackatime.hackclub.com/docs".underline().cyan()
+    );
 
     Ok(())
 }

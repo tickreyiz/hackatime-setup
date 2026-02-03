@@ -48,6 +48,20 @@ pub fn all_editors() -> Vec<Box<dyn EditorPlugin>> {
             macos_app_name: "Antigravity",
             windows_app_folder: "antigravity",
         }),
+        Box::new(VsCodeFamily {
+            name: "VSCodium",
+            config_subdir: ".vscode-oss",
+            cli_command: "codium",
+            macos_app_name: "VSCodium",
+            windows_app_folder: "VSCodium",
+        }),
+        Box::new(VsCodeFamily {
+            name: "Trae",
+            config_subdir: ".trae",
+            cli_command: "trae",
+            macos_app_name: "Trae",
+            windows_app_folder: "Trae",
+        }),
         // JetBrains family
         Box::new(JetBrainsFamily {
             name: "IntelliJ IDEA Ultimate",
