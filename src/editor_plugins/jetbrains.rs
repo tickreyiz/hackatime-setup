@@ -118,32 +118,25 @@ impl JetBrainsFamily {
     }
 
     fn find_cli(&self) -> Option<PathBuf> {
-        #[cfg(not(target_os = "windows"))]
-        if let Ok(output) = Command::new("which").arg(self.cli_command).output()
-            && output.status.success()
+        // On Windows, the CLI is typically available as a shell command directly
+        #[cfg(target_os = "windows")]
         {
-            let path = String::from_utf8_lossy(&output.stdout).trim().to_string();
-            if !path.is_empty() {
-                return Some(PathBuf::from(path));
-            }
+            return Some(PathBuf::from(self.cli_command));
         }
 
-        #[cfg(target_os = "windows")]
-        if let Ok(output) = Command::new("where").arg(self.cli_command).output() {
-            if output.status.success() {
-                let path = String::from_utf8_lossy(&output.stdout)
-                    .lines()
-                    .next()
-                    .map(|s| s.trim().to_string());
-                if let Some(p) = path {
-                    if !p.is_empty() {
-                        return Some(PathBuf::from(p));
-                    }
+        #[cfg(not(target_os = "windows"))]
+        {
+            if let Ok(output) = Command::new("which").arg(self.cli_command).output()
+                && output.status.success()
+            {
+                let path = String::from_utf8_lossy(&output.stdout).trim().to_string();
+                if !path.is_empty() {
+                    return Some(PathBuf::from(path));
                 }
             }
-        }
 
-        self.get_cli_paths().into_iter().find(|path| path.exists())
+            self.get_cli_paths().into_iter().find(|path| path.exists())
+        }
     }
 }
 
