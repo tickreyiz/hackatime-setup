@@ -1,12 +1,14 @@
 mod jetbrains;
 mod utils;
 mod vscode;
+mod xcode;
 mod zed;
 
 use color_eyre::Result;
 
 pub use jetbrains::JetBrainsFamily;
 pub use vscode::VsCodeFamily;
+pub use xcode::Xcode;
 pub use zed::Zed;
 
 pub trait EditorPlugin: Send + Sync {
@@ -65,6 +67,8 @@ pub fn all_editors() -> Vec<Box<dyn EditorPlugin>> {
             macos_app_name: "Trae",
             windows_app_folder: "Trae",
         }),
+        // Xcode (macOS only)
+        Box::new(Xcode),
         // Zed
         Box::new(Zed),
         // JetBrains family

@@ -527,6 +527,7 @@ dependencies = [
  "rust-ini",
  "serde",
  "serde_json",
+ "tempfile",
  "termcolor",
  "terminal_size",
  "uuid",
