@@ -1,4 +1,4 @@
- {
+{
   description = "Hackatime setup tool";
 
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -19,6 +19,14 @@
             aarch64-darwin = "macos-aarch64";
           };
           assetName = "hackatime_setup-${platformMap.${system}}.tar.gz";
+          
+          
+          sha256Map = {
+            x86_64-linux = "17v1zhxqqqc5sha9k9z0d9w9cpcrfhc8l93kq3slyccjm6jfwc8c";
+            aarch64-linux = "15lqbygas6g089icjscp9vxh33sfgfszshymc3l2wx73nipf1ahn";
+            x86_64-darwin = "0xlfghdiwyfgr3pl18ssb9y44vcd0galxmdlrrx2j1q0qi56x3dc";
+            aarch64-darwin = "1v39h7ag1zazsh9h4ndk2r7wiqm5nk44kiakdsvp32y3i2mgiimr";
+          };
         in
         {
           default = pkgs.stdenv.mkDerivation rec {
@@ -27,12 +35,7 @@
 
             src = pkgs.fetchurl {
               url = "https://github.com/hackclub/hackatime-setup/releases/download/v${version}/${assetName}";
-              sha256 = {
-                x86_64-linux = "17v1zhxqqqc5sha9k9z0d9w9cpcrfhc8l93kq3slyccjm6jfwc8c";
-                aarch64-linux = "15lqbygas6g089icjscp9vxh33sfgfszshymc3l2wx73nipf1ahn";
-                x86_64-darwin = "0xlfghdiwyfgr3pl18ssb9y44vcd0galxmdlrrx2j1q0qi56x3dc";
-                aarch64-darwin = "1v39h7ag1zazsh9h4ndk2r7wiqm5nk44kiakdsvp32y3i2mgiimr";
-              }.${system};
+              sha256 = sha256Map.${system} or (throw "Unsupported system: ${system}");
             };
 
             unpackPhase = "tar -xzf $src";
