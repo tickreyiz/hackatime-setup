@@ -31,7 +31,10 @@ OS="$(uname -s)"
 if [ -f /etc/NIXOS ]; then
   echo "NixOS detected"
   echo "You can build the hackatime-setup using this command:"
-  echo "nix run github:hackclub/hackatime-setup"
+  echo ""
+  echo "nix run github:hackclub/hackatime-setup && ./result/bin/hackatime-setup --key \"YOUR-API-KEY\""
+
+
   exit 0
 fi
 case "$OS" in
