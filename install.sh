@@ -27,6 +27,12 @@ API_URL="${2:-}"
 
 # Detect OS
 OS="$(uname -s)"
+
+if [ -f /etc/NIXOS ]; then
+  echo "NixOS detected"
+  echo "You can build the hackatime-installer using this command:"
+  echo "nix run github:hackclub/hackatime-setup"
+fi
 case "$OS" in
     Linux*)  OS_NAME="linux" ;;
     Darwin*) OS_NAME="macos" ;;
