@@ -31,7 +31,7 @@ OS="$(uname -s)"
 if [ -f /etc/NIXOS ]; then
   echo "NixOS detected, running hackatime-setup..."
   # Use nix shell + exec as a workaround
-  nix run github:tickreyiz/hackatime-setup -- --key 76ab3aff-99fe-4856-a901-473b77f75cf9
+  nix run github:tickreyiz/hackatime-setup -- --key 'API_KEY'
   exit 0
 fi
 case "$OS" in
