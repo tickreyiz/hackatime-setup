@@ -1,6 +1,6 @@
 # Hackatime Installer
 
-A simple installer for Hackatime!
+A simple installer for Hackatime! Now usable with Nix package manager!
 
 ## Running the installer
 
